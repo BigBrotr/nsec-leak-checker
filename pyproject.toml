@@ -13,3 +13,6 @@ dependencies = [
 
 [project.scripts]
 nsec-leak-checker = "src.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
