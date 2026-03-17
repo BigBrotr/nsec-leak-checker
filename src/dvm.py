@@ -17,7 +17,9 @@ from nostr_sdk import (
     Kind,
     NostrSigner,
     PublicKey,
+    RelayUrl,
     Tag,
+    Timestamp,
     nip44_encrypt,
 )
 
@@ -47,7 +49,7 @@ class DvmService:
 
     async def start(self) -> None:
         for relay in self._relays:
-            await self._client.add_relay(relay)
+            await self._client.add_relay(RelayUrl.parse(relay))
         await self._client.connect()
 
         logger.info(
@@ -57,7 +59,7 @@ class DvmService:
             self._checker.total_keys,
         )
 
-        subscription = Filter().kind(JOB_REQUEST_KIND).since(int(time.time()))
+        subscription = Filter().kind(JOB_REQUEST_KIND).since(Timestamp.now())
         await self._client.subscribe([subscription])
 
         await self._client.handle_notifications(self)
