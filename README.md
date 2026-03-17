@@ -25,7 +25,7 @@ A live instance is running and can be queried by anyone:
 
 ### How to Query
 
-Send a **Kind 5300** event signed with your keypair to any of the relays above. The content can be anything — the DVM only checks the pubkey that signed the request.
+Send a **Kind 5300** event signed with your keypair to any of the relays above. The event must include a `p` tag targeting the DVM's pubkey. The content can be anything — the DVM only checks the pubkey that signed the request.
 
 **Using Python (nostr-sdk):**
 
@@ -34,7 +34,7 @@ import asyncio
 from datetime import timedelta
 from nostr_sdk import (
     Client, EventBuilder, Filter, Keys, Kind,
-    Nip44Version, NostrSigner, PublicKey, RelayUrl, Timestamp,
+    NostrSigner, PublicKey, RelayUrl, Tag,
     nip44_decrypt,
 )
 
@@ -44,8 +44,12 @@ async def check_my_nsec():
     await client.add_relay(RelayUrl.parse("wss://relay.damus.io"))
     await client.connect()
 
-    # Send job request
-    await client.send_event_builder(EventBuilder(Kind(5300), "check"))
+    # Send job request (p-tag targets the DVM)
+    await client.send_event_builder(
+        EventBuilder(Kind(5300), "check").tags([
+            Tag.parse(["p", "90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a"])
+        ])
+    )
 
     # Wait and fetch response
     await asyncio.sleep(10)
@@ -66,7 +70,7 @@ asyncio.run(check_my_nsec())
 
 ```bash
 # Send job request
-nak event -k 5300 --sec nsec1... --content "check" wss://relay.damus.io
+nak event -k 5300 --sec nsec1... --content "check" -t p=90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a wss://relay.damus.io
 
 # Fetch response (replace <your-pubkey-hex> with your pubkey)
 nak req -k 6300 --author 90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a -t p=<your-pubkey-hex> wss://relay.damus.io
