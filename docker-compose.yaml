@@ -1,0 +1,19 @@
+services:
+  nsec-leak-checker:
+    build: .
+    container_name: nsec-leak-checker
+    restart: unless-stopped
+
+    environment:
+      NOSTR_PRIVATE_KEY: ${NOSTR_PRIVATE_KEY}
+      DATA_DIR: /app/data
+      RELAYS: ${RELAYS:-wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net,wss://relay.mostr.pub}
+
+    volumes:
+      - ./data:/app/data:ro
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

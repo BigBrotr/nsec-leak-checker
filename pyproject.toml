@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nsec-leak-checker"
+version = "0.1.0"
+description = "Nostr DVM that checks if your private key has been exposed in public events"
+requires-python = ">=3.11"
+dependencies = [
+    "nostr-sdk>=0.39.0",
+]
+
+[project.scripts]
+nsec-leak-checker = "src.main:main"
