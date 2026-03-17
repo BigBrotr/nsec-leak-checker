@@ -60,7 +60,7 @@ class DvmService:
         )
 
         subscription = Filter().kind(JOB_REQUEST_KIND).since(Timestamp.now())
-        await self._client.subscribe([subscription])
+        await self._client.subscribe(subscription)
 
         await self._client.handle_notifications(self)
 
