@@ -72,7 +72,10 @@ class DvmService:
 
     async def _poll(self) -> None:
         fetch_ts = Timestamp.now()
-        f = Filter().kind(JOB_REQUEST_KIND).since(self._last_fetch_ts)
+        f = (Filter()
+             .kind(JOB_REQUEST_KIND)
+             .pubkey(self._keys.public_key())
+             .since(self._last_fetch_ts))
         events = await self._client.fetch_events(f, FETCH_TIMEOUT)
 
         for event in events.to_vec():
