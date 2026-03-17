@@ -103,10 +103,21 @@ class DvmService:
             leak_info = self._checker.get_leak_info(requester_hex)
             leak_events = self._checker.get_leak_events(requester_hex)
 
+            compact_events = [
+                {
+                    "id": e["id"],
+                    "pubkey": e["pubkey"],
+                    "kind": e["kind"],
+                    "created_at": e["created_at"],
+                }
+                for e in leak_events[:50]
+            ]
+
             result = {
                 "status": "leaked",
                 "categories": leak_info.categories if leak_info else "",
-                "events": leak_events,
+                "total_events": len(leak_events),
+                "events": compact_events,
             }
             logger.info(
                 "LEAKED | pubkey=%s | categories=%s | events=%d",
