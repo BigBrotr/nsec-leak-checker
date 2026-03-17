@@ -127,13 +127,12 @@ class DvmService:
             Nip44Version.V2,
         )
 
-        result_event = (
-            EventBuilder(JOB_RESULT_KIND, encrypted)
-            .tag(Tag.parse(["p", requester_hex]))
-            .tag(Tag.parse(["e", event.id().to_hex()]))
-            .tag(Tag.parse(["encrypted"]))
-            .tag(Tag.parse(["status", "success"]))
-        )
+        result_event = EventBuilder(JOB_RESULT_KIND, encrypted).tags([
+            Tag.parse(["p", requester_hex]),
+            Tag.parse(["e", event.id().to_hex()]),
+            Tag.parse(["encrypted"]),
+            Tag.parse(["status", "success"]),
+        ])
 
         await self._client.send_event_builder(result_event)
         logger.info("Result sent to %s", requester_hex[:16])
