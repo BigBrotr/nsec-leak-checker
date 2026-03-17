@@ -5,18 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from nostr_sdk import (
     Client,
-    Event,
     EventBuilder,
     Filter,
     Keys,
     Kind,
     NostrSigner,
-    PublicKey,
     RelayUrl,
     Tag,
     Timestamp,
@@ -30,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 JOB_REQUEST_KIND = Kind(5300)
 JOB_RESULT_KIND = Kind(6300)
+FETCH_TIMEOUT = timedelta(seconds=30)
+POLL_INTERVAL = 5
 
 
 class DvmService:
@@ -46,11 +46,14 @@ class DvmService:
         self._checker = checker
         self._relays = relays
         self._client = Client(self._signer)
+        self._processed_ids: set[str] = set()
 
     async def start(self) -> None:
         for relay in self._relays:
             await self._client.add_relay(RelayUrl.parse(relay))
         await self._client.connect()
+
+        self._last_fetch_ts = Timestamp.now()
 
         logger.info(
             "DVM started | pubkey=%s | relays=%s | dataset=%d keys",
@@ -59,26 +62,40 @@ class DvmService:
             self._checker.total_keys,
         )
 
-        subscription = Filter().kind(JOB_REQUEST_KIND).since(Timestamp.now())
-        await self._client.subscribe(subscription)
+        while True:
+            try:
+                await self._poll()
+            except Exception as e:
+                logger.error("Poll error: %s", e)
+            await asyncio.sleep(POLL_INTERVAL)
 
-        await self._client.handle_notifications(self)
+    async def _poll(self) -> None:
+        fetch_ts = Timestamp.now()
+        f = Filter().kind(JOB_REQUEST_KIND).since(self._last_fetch_ts)
+        events = await self._client.fetch_events(f, FETCH_TIMEOUT)
 
-    async def handle(self, _relay_url: str, _subscription_id: str, event: Event) -> bool:
-        """Called by nostr-sdk for each received event."""
-        try:
-            await self._handle_job_request(event)
-        except Exception as e:
-            logger.error("Failed to handle event %s: %s", event.id().to_hex()[:16], e)
-        return False  # keep listening
+        for event in events.to_vec():
+            event_id = event.id().to_hex()
+            if event_id in self._processed_ids:
+                continue
+            self._processed_ids.add(event_id)
 
-    async def _handle_job_request(self, event: Event) -> None:
+            try:
+                await self._handle_job_request(event)
+            except Exception as e:
+                logger.error("Failed to handle event %s: %s", event_id[:16], e)
+
+        self._last_fetch_ts = fetch_ts
+
+        if len(self._processed_ids) > 10_000:
+            self._processed_ids.clear()
+
+    async def _handle_job_request(self, event) -> None:
         requester = event.author()
         requester_hex = requester.to_hex()
 
         logger.info("Job request from %s", requester_hex[:16])
 
-        # The requester is checking their own pubkey (proven by signature)
         is_leaked = self._checker.is_leaked(requester_hex)
 
         if is_leaked:
@@ -102,14 +119,12 @@ class DvmService:
 
         result_json = json.dumps(result, ensure_ascii=False)
 
-        # Encrypt with NIP-44
         encrypted = nip44_encrypt(
             self._keys.secret_key(),
             requester,
             result_json,
         )
 
-        # Build result event
         result_event = (
             EventBuilder(JOB_RESULT_KIND, encrypted)
             .tag(Tag.parse(["p", requester_hex]))
