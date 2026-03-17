@@ -11,6 +11,69 @@ A Nostr DVM (Data Vending Machine) that lets users check if their private key ha
 
 No one else can see the result. The signature on the request is the proof of identity — no additional verification needed.
 
+## Public Instance
+
+A live instance is running and can be queried by anyone:
+
+| Field | Value |
+|---|---|
+| npub | `npub1jry923t9zkmqf0m2h99tlg3ak3xumg2h990ql3kujs5eher48v9qhv3ht5` |
+| hex | `90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a` |
+| Relays | `wss://relay.damus.io`, `wss://nos.lol`, `wss://relay.primal.net`, `wss://relay.mostr.pub` |
+| Request Kind | 5300 |
+| Response Kind | 6300 (NIP-44 encrypted) |
+
+### How to Query
+
+Send a **Kind 5300** event signed with your keypair to any of the relays above. The content can be anything — the DVM only checks the pubkey that signed the request.
+
+**Using Python (nostr-sdk):**
+
+```python
+import asyncio
+from datetime import timedelta
+from nostr_sdk import (
+    Client, EventBuilder, Filter, Keys, Kind,
+    Nip44Version, NostrSigner, PublicKey, RelayUrl, Timestamp,
+    nip44_decrypt,
+)
+
+async def check_my_nsec():
+    keys = Keys.parse("nsec1...")  # your nsec
+    client = Client(NostrSigner.keys(keys))
+    await client.add_relay(RelayUrl.parse("wss://relay.damus.io"))
+    await client.connect()
+
+    # Send job request
+    await client.send_event_builder(EventBuilder(Kind(5300), "check"))
+
+    # Wait and fetch response
+    await asyncio.sleep(10)
+    dvm = PublicKey.parse("90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a")
+    f = Filter().kind(Kind(6300)).author(dvm).pubkey(keys.public_key())
+    events = await client.fetch_events(f, timedelta(seconds=10))
+
+    for event in events.to_vec():
+        decrypted = nip44_decrypt(keys.secret_key(), event.author(), event.content())
+        print(decrypted)
+
+    await client.disconnect()
+
+asyncio.run(check_my_nsec())
+```
+
+**Using nak (CLI):**
+
+```bash
+# Send job request
+nak event -k 5300 --sec nsec1... --content "check" wss://relay.damus.io
+
+# Fetch response (replace <your-pubkey-hex> with your pubkey)
+nak req -k 6300 --author 90c8552ad1616c24f6aba95abf447b5626e6945728b83fc6dc53932be3ea758a -t p=<your-pubkey-hex> wss://relay.damus.io
+```
+
+Note: the nak response will be NIP-44 encrypted — you'll need to decrypt it with your nsec.
+
 ## Dataset
 
 The dataset was built by analyzing 40 million Nostr events archived by [BigBrotr](https://github.com/BigBrotr/bigbrotr) from 1,079 relays. See the [full analysis](https://bigbrotr.com/blog/exposed-nsec-analysis/) for methodology and findings.

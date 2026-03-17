@@ -14,6 +14,7 @@ from nostr_sdk import (
     Filter,
     Keys,
     Kind,
+    Nip44Version,
     NostrSigner,
     RelayUrl,
     Tag,
@@ -123,6 +124,7 @@ class DvmService:
             self._keys.secret_key(),
             requester,
             result_json,
+            Nip44Version.V2,
         )
 
         result_event = (
